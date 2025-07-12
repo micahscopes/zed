@@ -198,6 +198,7 @@ impl ThreadStore {
             _subscriptions: subscriptions,
         };
         this.register_context_server_handlers(cx);
+        this.register_mcp_operation_tools(cx);
         this.reload(cx).detach_and_log_err(cx);
         (this, ready_rx)
     }
@@ -258,6 +259,7 @@ impl ThreadStore {
             }),
         };
 
+        let _context_server_store = self.project.read(cx).context_server_store();
         cx.spawn(async move |this, cx| {
             let (worktrees, default_user_rules) =
                 future::join(future::join_all(worktree_tasks), default_user_rules_task).await;
@@ -294,10 +296,13 @@ impl ThreadStore {
                     }
                 })
                 .collect::<Vec<_>>();
+            
+            // Collect MCP server information
+            let mcp_servers = Vec::new(); // TODO: Implement MCP server info collection in async context
 
             this.update(cx, |this, _cx| {
                 *this.project_context.0.borrow_mut() =
-                    Some(ProjectContext::new(worktrees, default_user_rules));
+                    Some(ProjectContext::new(worktrees, default_user_rules).with_mcp_servers(mcp_servers));
             })
             .ok();
         })
@@ -519,6 +524,22 @@ impl ThreadStore {
         for server in context_server_store.read(cx).running_servers() {
             self.load_context_server_tools(server.id(), context_server_store.clone(), cx);
         }
+    }
+    
+    fn register_mcp_operation_tools(&self, cx: &mut Context<Self>) {
+        use assistant_tools::{
+            McpPromptsListTool, McpPromptsGetTool, 
+            McpResourcesListTool, McpResourcesReadTool
+        };
+        
+        // Register MCP operation tools that allow the LLM to interact with MCP servers
+        let context_server_store = self.project.read(cx).context_server_store();
+        self.tools.update(cx, |tools, cx| {
+            tools.insert(Arc::new(McpPromptsListTool::new(context_server_store.clone())), cx);
+            tools.insert(Arc::new(McpPromptsGetTool::new(context_server_store.clone())), cx);
+            tools.insert(Arc::new(McpResourcesListTool::new(context_server_store.clone())), cx);
+            tools.insert(Arc::new(McpResourcesReadTool::new(context_server_store.clone())), cx);
+        });
     }
 
     fn handle_context_server_event(
