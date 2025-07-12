@@ -259,7 +259,7 @@ impl ThreadStore {
             }),
         };
 
-        let _context_server_manager = self.context_server_manager.clone();
+        let _context_server_store = self.project.read(cx).context_server_store();
         cx.spawn(async move |this, cx| {
             let (worktrees, default_user_rules) =
                 future::join(future::join_all(worktree_tasks), default_user_rules_task).await;
@@ -533,11 +533,12 @@ impl ThreadStore {
         };
         
         // Register MCP operation tools that allow the LLM to interact with MCP servers
-        self.tools.update(cx, |tools, _| {
-            tools.insert(Arc::new(McpPromptsListTool::new(self.context_server_manager.clone())));
-            tools.insert(Arc::new(McpPromptsGetTool::new(self.context_server_manager.clone())));
-            tools.insert(Arc::new(McpResourcesListTool::new(self.context_server_manager.clone())));
-            tools.insert(Arc::new(McpResourcesReadTool::new(self.context_server_manager.clone())));
+        let context_server_store = self.project.read(cx).context_server_store();
+        self.tools.update(cx, |tools, cx| {
+            tools.insert(Arc::new(McpPromptsListTool::new(context_server_store.clone())), cx);
+            tools.insert(Arc::new(McpPromptsGetTool::new(context_server_store.clone())), cx);
+            tools.insert(Arc::new(McpResourcesListTool::new(context_server_store.clone())), cx);
+            tools.insert(Arc::new(McpResourcesReadTool::new(context_server_store.clone())), cx);
         });
     }
 

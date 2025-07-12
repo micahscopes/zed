@@ -3,9 +3,9 @@ use std::sync::Arc;
 use crate::schema::json_schema_for;
 use anyhow::{Result, anyhow};
 use assistant_tool::{ActionLog, Tool, ToolResult};
-use context_server::manager::ContextServerManager;
-use gpui::{App, Entity, Task};
-use language_model::{LanguageModelRequestMessage, LanguageModelToolSchemaFormat};
+use project::context_server_store::ContextServerStore;
+use gpui::{AnyWindowHandle, App, Entity, Task};
+use language_model::{LanguageModel, LanguageModelRequest, LanguageModelToolSchemaFormat};
 use project::Project;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -24,13 +24,13 @@ pub struct McpPromptsGetToolInput {
 }
 
 pub struct McpPromptsGetTool {
-    context_server_manager: Entity<ContextServerManager>,
+    context_server_store: Entity<ContextServerStore>,
 }
 
 impl McpPromptsGetTool {
-    pub fn new(context_server_manager: Entity<ContextServerManager>) -> Self {
+    pub fn new(context_server_store: Entity<ContextServerStore>) -> Self {
         Self {
-            context_server_manager,
+            context_server_store,
         }
     }
 }
@@ -61,12 +61,18 @@ impl Tool for McpPromptsGetTool {
         format!("Get MCP prompt '{}' from {}", input.prompt_name, input.server_name)
     }
 
+    fn may_perform_edits(&self) -> bool {
+        false
+    }
+
     fn run(
         self: Arc<Self>,
         input: serde_json::Value,
-        _messages: &[LanguageModelRequestMessage],
+        _request: Arc<LanguageModelRequest>,
         _project: Entity<Project>,
         _action_log: Entity<ActionLog>,
+        _model: Arc<dyn LanguageModel>,
+        _window: Option<AnyWindowHandle>,
         cx: &mut App,
     ) -> ToolResult {
         let input: McpPromptsGetToolInput = match serde_json::from_value(input) {
@@ -74,77 +80,11 @@ impl Tool for McpPromptsGetTool {
             Err(err) => return Task::ready(Err(anyhow!(err))).into(),
         };
 
-        let context_server_manager = self.context_server_manager.clone();
-        let task = cx.spawn(async move |cx| {
-            let server = cx.update(|cx| {
-                context_server_manager.read(cx).get_server(&input.server_name)
-            })?;
-
-            let server = server.ok_or_else(|| anyhow!("MCP server '{}' not found", input.server_name))?;
-            
-            let protocol = server.client()
-                .ok_or_else(|| anyhow!("MCP server '{}' is not initialized", input.server_name))?;
-
-            if !protocol.capable(context_server::protocol::ServerCapability::Prompts) {
-                return Err(anyhow!("MCP server '{}' does not support prompts", input.server_name));
-            }
-
-            // Convert arguments to HashMap<String, String> if provided
-            let arguments = if let Some(args) = input.arguments {
-                match args {
-                    Value::Object(map) => {
-                        let mut string_map = std::collections::HashMap::new();
-                        for (k, v) in map {
-                            let value_str = match v {
-                                Value::String(s) => s,
-                                _ => v.to_string(),
-                            };
-                            string_map.insert(k, value_str);
-                        }
-                        string_map
-                    }
-                    _ => std::collections::HashMap::new(),
-                }
-            } else {
-                std::collections::HashMap::new()
-            };
-
-            let response = protocol.run_prompt(&input.prompt_name, arguments).await
-                .map_err(|e| anyhow!("Failed to get prompt: {}", e))?;
-
-            let mut output = String::new();
-            
-            if let Some(desc) = &response.description {
-                output.push_str(&format!("Prompt: {}\n", desc));
-                output.push_str("---\n");
-            }
-
-            output.push_str("Messages:\n\n");
-
-            for message in &response.messages {
-                output.push_str(&format!("Role: {:?}\n", message.role));
-                output.push_str("Content:\n");
-                
-                match &message.content {
-                    context_server::types::MessageContent::Text { text, annotations: _ } => {
-                        output.push_str(&text);
-                    }
-                    context_server::types::MessageContent::Resource { resource, annotations: _ } => {
-                        output.push_str(&format!("Resource: {}\n", resource.uri));
-                        if let Some(mime_type) = &resource.mime_type {
-                            output.push_str(&format!("MIME type: {}\n", mime_type));
-                        }
-                        // Note: ResourceContents doesn't have text/blob fields - those are in the response
-                        output.push_str("[Resource content would be fetched separately]\n");
-                    }
-                    context_server::types::MessageContent::Image { data, mime_type, annotations: _ } => {
-                        output.push_str(&format!("[Image: {} bytes ({})]", data.len(), mime_type));
-                    }
-                }
-                output.push_str("\n\n");
-            }
-
-            Ok(output)
+        let _context_server_store = self.context_server_store.clone();
+        let task = cx.spawn(async move |_cx| {
+            // TODO: Implement proper MCP prompt retrieval
+            // For now, return a placeholder error since the API is not fully implemented
+            Err(anyhow!("MCP prompt retrieval not yet implemented for server '{}', prompt '{}'", input.server_name, input.prompt_name))
         });
 
         task.into()
