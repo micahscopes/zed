@@ -8,6 +8,10 @@ mod fetch_tool;
 mod find_path_tool;
 mod grep_tool;
 mod list_directory_tool;
+mod mcp_prompts_get_tool;
+mod mcp_prompts_list_tool;
+mod mcp_resources_list_tool;
+mod mcp_resources_read_tool;
 mod move_path_tool;
 mod now_tool;
 mod open_tool;
@@ -49,6 +53,10 @@ pub use open_tool::OpenTool;
 pub use project_notifications_tool::ProjectNotificationsTool;
 pub use read_file_tool::{ReadFileTool, ReadFileToolInput};
 pub use terminal_tool::TerminalTool;
+pub use crate::mcp_prompts_get_tool::McpPromptsGetTool;
+pub use crate::mcp_prompts_list_tool::McpPromptsListTool;
+pub use crate::mcp_resources_list_tool::McpResourcesListTool;
+pub use crate::mcp_resources_read_tool::McpResourcesReadTool;
 
 pub fn init(http_client: Arc<HttpClientWithUrl>, cx: &mut App) {
     assistant_tool::init(cx);

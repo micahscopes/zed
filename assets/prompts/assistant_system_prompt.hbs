@@ -176,4 +176,29 @@ Rules title: {{title}}
 ``````
 {{/each}}
 {{/if}}
+
+<user_environment>
+Operating System: {{os}} ({{arch}})
+Shell: {{shell}}
+</user_environment>
+{{#if mcp_servers}}
+
+<mcp_context>
+The following Model Context Protocol (MCP) servers are available:
+
+{{#each mcp_servers}}
+**{{name}}**:
+{{#if prompts}}
+- Available commands (accessible as @commands):
+{{#each prompts}}
+  - `{{name}}`{{#if description}}: {{description}}{{/if}}
+{{/each}}
+{{/if}}
+{{#if has_resources}}
+- Has {{resource_count}} resources available (Note: MCP resources are not directly accessible in Zed)
+{{/if}}
+
+{{/each}}
+</mcp_context>
+{{/if}}
 {{/if}}

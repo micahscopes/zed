@@ -1,0 +1,23 @@
+// Zed custom keymap to ensure dock toggle shortcuts work regardless of focus
+//
+// This binds dock toggle shortcuts to a global context so they work everywhere
+// including when dock panels have focus
+
+[
+  {
+    "context": "*", // Global context to ensure it works everywhere
+    "bindings": {
+      "ctrl-b": "workspace::ToggleLeftDock",
+      "ctrl-j": "workspace::ToggleBottomDock",
+      "ctrl-alt-b": "workspace::ToggleRightDock",
+      "ctrl-shift-j": "workspace::ToggleLeftDock" // Add this as an alternate binding for left dock
+    }
+  },
+  {
+    // Make sure find-all-replace doesn't interfere with our dock toggle
+    "context": "Workspace",
+    "bindings": {
+      "ctrl-shift-h": ["pane::DeploySearch", { "replace_enabled": true }]
+    }
+  }
+]

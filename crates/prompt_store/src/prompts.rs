@@ -29,6 +29,21 @@ pub struct ProjectContext {
     pub os: String,
     pub arch: String,
     pub shell: String,
+    pub mcp_servers: Vec<McpServerContext>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct McpServerContext {
+    pub name: String,
+    pub prompts: Vec<McpPromptInfo>,
+    pub has_resources: bool,
+    pub resource_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct McpPromptInfo {
+    pub name: String,
+    pub description: Option<String>,
 }
 
 impl ProjectContext {
@@ -44,7 +59,13 @@ impl ProjectContext {
             os: std::env::consts::OS.to_string(),
             arch: std::env::consts::ARCH.to_string(),
             shell: get_system_shell(),
+            mcp_servers: Vec::new(),
         }
+    }
+    
+    pub fn with_mcp_servers(mut self, mcp_servers: Vec<McpServerContext>) -> Self {
+        self.mcp_servers = mcp_servers;
+        self
     }
 }
 
