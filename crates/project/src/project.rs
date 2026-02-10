@@ -398,6 +398,13 @@ pub enum Event {
     WorkspaceEditApplied(ProjectTransaction),
     AgentLocationChanged,
     BufferEdited,
+    ShowDocument {
+        url: String,
+        external: bool,
+        path: Option<PathBuf>,
+        selection: Option<lsp::Range>,
+        take_focus: bool,
+    },
 }
 
 pub struct AgentLocationChanged;
@@ -3466,6 +3473,19 @@ impl Project {
             LspStoreEvent::WorkspaceEditApplied(transaction) => {
                 cx.emit(Event::WorkspaceEditApplied(transaction.clone()))
             }
+            LspStoreEvent::ShowDocument {
+                url,
+                external,
+                path,
+                selection,
+                take_focus,
+            } => cx.emit(Event::ShowDocument {
+                url: url.clone(),
+                external: *external,
+                path: path.clone(),
+                selection: *selection,
+                take_focus: *take_focus,
+            }),
         }
     }
 

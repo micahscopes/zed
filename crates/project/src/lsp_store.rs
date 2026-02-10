@@ -1243,6 +1243,22 @@ impl LocalLspStore {
             })
             .detach();
 
+        language_server
+            .on_request::<lsp::request::ShowDocument, _, _>({
+                let this = lsp_store.clone();
+                move |params, cx| {
+                    let this = this.clone();
+                    let mut cx = cx.clone();
+                    async move {
+                        let success = this
+                            .update(&mut cx, |this, cx| this.handle_show_document(params, cx))
+                            .unwrap_or(false);
+                        Ok(lsp::ShowDocumentResult { success })
+                    }
+                }
+            })
+            .detach();
+
         let disk_based_diagnostics_progress_token =
             adapter.disk_based_diagnostics_progress_token.clone();
 
@@ -4005,6 +4021,13 @@ pub enum LspStoreEvent {
         most_recent_edit: clock::Lamport,
     },
     WorkspaceEditApplied(ProjectTransaction),
+    ShowDocument {
+        url: String,
+        external: bool,
+        path: Option<PathBuf>,
+        selection: Option<lsp::Range>,
+        take_focus: bool,
+    },
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -9804,6 +9827,44 @@ impl LspStore {
 
     pub fn language_server_for_id(&self, id: LanguageServerId) -> Option<Arc<LanguageServer>> {
         self.as_local()?.language_server_for_id(id)
+    }
+
+    fn handle_show_document(
+        &mut self,
+        params: lsp::ShowDocumentParams,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let external = params.external.unwrap_or(false);
+        let take_focus = params.take_focus.unwrap_or(true);
+        let url = params.uri.to_string();
+
+        log::info!("LSP showDocument request: url={url}, external={external}");
+
+        if external {
+            cx.emit(LspStoreEvent::ShowDocument {
+                url,
+                external: true,
+                path: None,
+                selection: params.selection,
+                take_focus,
+            });
+            return true;
+        }
+
+        let Ok(path) = params.uri.to_file_path() else {
+            log::warn!("LSP showDocument: failed to convert URI to file path: {url}");
+            return false;
+        };
+
+        log::info!("LSP showDocument: opening file {path:?}");
+        cx.emit(LspStoreEvent::ShowDocument {
+            url,
+            external: false,
+            path: Some(path),
+            selection: params.selection,
+            take_focus,
+        });
+        true
     }
 
     fn on_lsp_progress(

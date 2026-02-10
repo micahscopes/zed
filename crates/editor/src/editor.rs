@@ -2263,6 +2263,70 @@ impl Editor {
                         }
                     }
 
+                    project::Event::ShowDocument {
+                        path,
+                        selection,
+                        take_focus,
+                        external: false,
+                        ..
+                    } => {
+                        let Some(selection) = selection else {
+                            return;
+                        };
+                        let Some(path) = path else {
+                            return;
+                        };
+                        let Some(workspace) = editor.workspace() else {
+                            return;
+                        };
+                        let Some(active_editor) = workspace.read(cx).active_item_as::<Self>(cx)
+                        else {
+                            return;
+                        };
+                        if active_editor.entity_id() != cx.entity_id() {
+                            return;
+                        }
+
+                        let selection = *selection;
+                        let take_focus = *take_focus;
+                        let path = path.clone();
+                        let workspace = workspace.downgrade();
+                        cx.spawn_in(window, async move |_, cx| {
+                            let item = workspace
+                                .update_in(cx, |workspace, window, cx| {
+                                    workspace.open_abs_path(
+                                        path,
+                                        workspace::OpenOptions {
+                                            focus: Some(take_focus),
+                                            ..Default::default()
+                                        },
+                                        window,
+                                        cx,
+                                    )
+                                })?
+                                .await?;
+                            if let Some(opened_editor) = item.downcast::<Editor>() {
+                                opened_editor.update_in(cx, |editor, window, cx| {
+                                    let start = Point::new(
+                                        selection.start.line,
+                                        selection.start.character,
+                                    );
+                                    let end = Point::new(
+                                        selection.end.line,
+                                        selection.end.character,
+                                    );
+                                    editor.go_to_singleton_buffer_range(
+                                        start..end,
+                                        window,
+                                        cx,
+                                    );
+                                })?;
+                            }
+                            anyhow::Ok(())
+                        })
+                        .detach_and_log_err(cx);
+                    }
+
                     _ => {}
                 },
             ));

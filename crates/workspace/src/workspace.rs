@@ -1393,6 +1393,29 @@ impl Workspace {
                     this.handle_agent_location_changed(window, cx)
                 }
 
+                project::Event::ShowDocument {
+                    url,
+                    external,
+                    path,
+                    take_focus,
+                    ..
+                } => {
+                    if *external {
+                        cx.open_url(url);
+                    } else if let Some(path) = path {
+                        this.open_abs_path(
+                            path.clone(),
+                            OpenOptions {
+                                focus: Some(*take_focus),
+                                ..Default::default()
+                            },
+                            window,
+                            cx,
+                        )
+                        .detach_and_log_err(cx);
+                    }
+                }
+
                 _ => {}
             }
             cx.notify()

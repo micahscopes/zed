@@ -447,6 +447,17 @@ impl HeadlessProject {
                 })
                 .detach();
             }
+            LspStoreEvent::ShowDocument { url, external, .. } => {
+                if *external {
+                    self.session
+                        .send(proto::Toast {
+                            project_id: REMOTE_SERVER_PROJECT_ID,
+                            notification_id: "lsp".to_string(),
+                            message: format!("Language server wants to open: {url}"),
+                        })
+                        .log_err();
+                }
+            }
             _ => {}
         }
     }
